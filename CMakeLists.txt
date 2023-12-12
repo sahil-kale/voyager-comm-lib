@@ -36,6 +36,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # Mocks
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/test/mocks)
 
+# Test msgs
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/test/test_msgs)
+
 # Add an executable with the above sources
 add_executable(${This} ${GLOBBED_SOURCE_FILES} ${UTILS_SOURCES} ${TEST_SOURCES})
 
