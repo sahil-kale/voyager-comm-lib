@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "voyager_comm.hpp"
-#include "voyager_comm_msgs.h"
 
 using namespace voyager_comm;
 
@@ -79,4 +78,29 @@ TEST(CommApi, PublishMultipleCallbacks) {
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
     EXPECT_EQ(subscriber1.num_messages_, 1);
     EXPECT_EQ(subscriber2.num_messages_, 1);
+}
+
+// Test multiple callbacks with free functions
+TEST(CommApi, PublishMultipleFreeFunctionCallbacks) {
+    Channel<TestMessage0> channel;
+    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    TestMessage0 msg;
+    msg.data_ = 0x42;
+    EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(most_recent_msg.data_, 0x42);
+}
+
+// Test multiple publishing
+TEST(CommApi, PublishMultiple) {
+    Channel<TestMessage0> channel;
+    FakeSubscriber subscriber;
+    Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback{&FakeSubscriber::Callback, &subscriber};
+
+    EXPECT_EQ(channel.Subscribe(callback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    TestMessage0 msg;
+    EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(subscriber.num_messages_, 1);
+    EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(subscriber.num_messages_, 2);
 }

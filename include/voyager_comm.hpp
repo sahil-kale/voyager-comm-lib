@@ -35,7 +35,13 @@ class Channel {
         U* obj;                     // Pointer to the class instance object that the callback function belongs to
     };
 
-    // Modified Subscribe method
+    /**
+     * @brief Subscribe to the channel
+     * @param callback The callback function to subscribe, must be a member function of class U
+     * @return SubscribeStatus::SUCCESS if the callback was subscribed successfully
+     * @note This method is used for subscribing to a member function callback and requires
+     *     a context parameter
+     */
     template <typename U>
     SubscribeStatus Subscribe(MemberFunctionCallback<U>& callback) {
         // Call the default Subscribe method with a pointer to the trampoline
@@ -57,8 +63,20 @@ class Channel {
         return SubscribeBase(cb, trampoline);
     }
 
+    /**
+     * @brief Subscribe to the channel
+     * @param cb The callback function to subscribe
+     * @return SubscribeStatus::SUCCESS if the callback was subscribed successfully
+     * @note This method is used for subscribing to a free function callback and does not
+     *      require a context parameter
+     */
     SubscribeStatus SubscribeNoContext(Callback cb) { return SubscribeBase(cb, nullptr); }
 
+    /**
+     * @brief Publish a message to all subscribers
+     * @param msg The message to publish
+     * @return PublishStatus::SUCCESS if the message was published successfully
+     */
     PublishStatus Publish(const T& msg) {
         for (uint8_t i = 0; i < num_callbacks_; i++) {
             if (callbacks_[i].trampoline == nullptr) {
@@ -79,8 +97,14 @@ class Channel {
     } CallbackTableEntry;
 
     CallbackTableEntry callbacks_[kMaxCallbacks] = {};
-    uint8_t num_callbacks_ = 0;
+    uint8_t num_callbacks_ = 0;  // Number of callbacks subscribed
 
+    /**
+     * @brief Base Subscribe method
+     * @param cb The callback function to subscribe
+     * @param trampoline The trampoline function to use
+     * @return SubscribeStatus::SUCCESS if the callback was subscribed successfully
+     */
     SubscribeStatus SubscribeBase(Callback cb, Trampoline trampoline) {
         SubscribeStatus status = SubscribeStatus::SUCCESS;
         do {
