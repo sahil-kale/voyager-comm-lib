@@ -104,3 +104,36 @@ TEST(CommApi, PublishMultiple) {
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
     EXPECT_EQ(subscriber.num_messages_, 2);
 }
+
+class FakeSubscriberSubscribingFromClass {
+   public:
+    FakeSubscriberSubscribingFromClass(Channel<TestMessage0>& testChannel) : num_messages_(0) {
+        // Create a member function callback from a class method
+        Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriberSubscribingFromClass> callback{
+            &FakeSubscriberSubscribingFromClass::Callback, this};
+
+        // Subscribe to the channel
+        Channel<TestMessage0>::SubscribeStatus status = testChannel.Subscribe(callback);
+
+        // Expect the subscription to succeed
+        EXPECT_EQ(status, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    }
+
+    void Callback(const TestMessage0& msg) {
+        (void)msg;
+        num_messages_++;
+        most_recent_msg_ = msg;
+    }
+    TestMessage0 most_recent_msg_;
+    uint32_t num_messages_;
+};
+
+// Test subscribing from a class
+TEST(CommApi, SubscribeFromClass) {
+    Channel<TestMessage0> channel;
+    FakeSubscriberSubscribingFromClass subscriber(channel);
+
+    TestMessage0 msg;
+    EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(subscriber.num_messages_, 1);
+}

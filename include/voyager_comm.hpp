@@ -21,6 +21,19 @@ class Channel {
         INVALID_PARAMETERS,
     };
 
+    Channel() = default;
+    ~Channel() = default;
+
+    // Delete the copy constructor and copy assignment operator
+    // This prevents the Channel from being copied, which can be
+    // done by accident and cause the channel to silently fail.
+    // There is no reason to copy a channel, so we delete these
+
+    // @note If you end up with a compiler error here, you are trying to copy a channel instead of
+    // pass a reference (or pointer) to it. This is a common mistake.
+    Channel(const Channel&) = delete;
+    Channel& operator=(const Channel&) = delete;
+
     /**************API***********/
     // Define a callback function type
     typedef void (*Callback)(const T&);
