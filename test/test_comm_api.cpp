@@ -35,7 +35,7 @@ TEST(CommApi, PublishCallback) {
     Channel<TestMessage0> channel;
     FakeSubscriber subscriber;
     Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback{&FakeSubscriber::Callback, &subscriber};
-    
+
     Channel<TestMessage0>::SubscribeResult status = channel.Subscribe(callback);
 
     EXPECT_EQ(status.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
@@ -147,4 +147,92 @@ TEST(CommApi, SubscribeFromClass) {
     TestMessage0 msg;
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
     EXPECT_EQ(subscriber.num_messages_, 1);
+}
+
+// Test unsubscribing
+TEST(CommApi, Unsubscribe) {
+    Channel<TestMessage0> channel;
+    FakeSubscriber subscriber;
+    Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback{&FakeSubscriber::Callback, &subscriber};
+
+    EXPECT_EQ(channel.Subscribe(callback).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.Publish(TestMessage0()), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(subscriber.num_messages_, 1);
+    EXPECT_EQ(channel.Unsubscribe(0).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.Publish(TestMessage0()), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(subscriber.num_messages_, 1);
+}
+
+// Test unsubscribing with max callbacks
+TEST(CommApi, UnsubscribeMaxCallbacks) {
+    Channel<TestMessage0> channel;
+    FakeSubscriber subscriber;
+    Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback{&FakeSubscriber::Callback, &subscriber};
+
+    // Subscribe to the channel 32 times
+    for (uint8_t i = 0; i < 32; i++) {
+        Channel<TestMessage0>::SubscribeResult status = channel.Subscribe(callback);
+        EXPECT_EQ(status.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+        EXPECT_EQ(status.index, i);
+        EXPECT_EQ(status.num_subscribers, i + 1);
+    }
+
+    // Unsubscribe from the channel 32 times
+    for (uint8_t i = 0; i < 32; i++) {
+        Channel<TestMessage0>::SubscribeResult status = channel.Unsubscribe(i);
+        EXPECT_EQ(status.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+        EXPECT_EQ(status.num_subscribers, 31 - i);
+    }
+
+    // Ensure the channel is empty
+    EXPECT_EQ(channel.Publish(TestMessage0()), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(channel.GetNumCallbacks(), 0);
+}
+
+// Test unsubscribing with an empty channel
+TEST(CommApi, UnsubscribeEmptyChannel) {
+    Channel<TestMessage0> channel;
+    EXPECT_EQ(channel.Unsubscribe(0).result, Channel<TestMessage0>::SubscribeStatus::INVALID_PARAMETERS);
+}
+
+// Test unsubscribing with an invalid index
+TEST(CommApi, UnsubscribeInvalidIndex) {
+    Channel<TestMessage0> channel;
+    FakeSubscriber subscriber;
+    Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback{&FakeSubscriber::Callback, &subscriber};
+
+    EXPECT_EQ(channel.Subscribe(callback).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.Unsubscribe(1).result, Channel<TestMessage0>::SubscribeStatus::INVALID_PARAMETERS);
+}
+
+// Test unsubscribing with 3 callbacks. unsubscribe the middle one and last one. Ensure the first is still subscribed.
+TEST(CommApi, UnsubscribeMiddle) {
+    Channel<TestMessage0> channel;
+    FakeSubscriber subscriber1;
+    FakeSubscriber subscriber2;
+    FakeSubscriber subscriber3;
+    Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback1{&FakeSubscriber::Callback, &subscriber1};
+    Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback2{&FakeSubscriber::Callback, &subscriber2};
+    Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback3{&FakeSubscriber::Callback, &subscriber3};
+
+    Channel<TestMessage0>::SubscribeResult status1 = channel.Subscribe(callback1);
+    Channel<TestMessage0>::SubscribeResult status2 = channel.Subscribe(callback2);
+    Channel<TestMessage0>::SubscribeResult status3 = channel.Subscribe(callback3);
+
+    EXPECT_EQ(status1.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(status1.index, 0);
+    EXPECT_EQ(status1.num_subscribers, 1);
+    EXPECT_EQ(status2.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(status2.num_subscribers, 2);
+    EXPECT_EQ(status3.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(status3.num_subscribers, 3);
+
+    EXPECT_EQ(channel.Unsubscribe(status2.index).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.Unsubscribe(status3.index).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+
+    TestMessage0 msg;
+    EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
+    EXPECT_EQ(subscriber1.num_messages_, 1);
+    EXPECT_EQ(subscriber2.num_messages_, 0);
+    EXPECT_EQ(subscriber3.num_messages_, 0);
 }

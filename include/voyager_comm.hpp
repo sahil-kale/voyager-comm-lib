@@ -21,14 +21,16 @@ class Channel {
         INVALID_PARAMETERS,
     };
 
-    typedef uint32_t subscribeindex_t;
+    typedef uint32_t subscriptionidx_t;
 
     class SubscribeResult {
        public:
-        SubscribeResult(SubscribeStatus status, uint32_t num_subscribers) : result(status), num_subscribers(num_subscribers) {}
+        SubscribeResult(SubscribeStatus status, subscriptionidx_t num_subscribers)
+            : result(status), num_subscribers(num_subscribers) {}
         SubscribeStatus result = 0;
-        subscribeindex_t index = 0;
-        subscribeindex_t num_subscribers = 0;
+        subscriptionidx_t index = 0;  // Index of the callback in the callback table, only valid if result == SUCCESS and the
+                                      // operation is a subscription
+        subscriptionidx_t num_subscribers = 0;
     };
 
     Channel() = default;
@@ -101,21 +103,63 @@ class Channel {
      * @return PublishStatus::SUCCESS if the message was published successfully
      */
     PublishStatus Publish(const T& msg) {
-        for (uint8_t i = 0; i < num_callbacks_; i++) {
-            if (callbacks_[i].trampoline == nullptr) {
-                callbacks_[i].cb(msg);
-            } else {
-                callbacks_[i].trampoline(msg, reinterpret_cast<void*>(callbacks_[i].cb));
+        for (uint8_t i = 0; i < kMaxCallbacks; i++) {
+            CallbackTableEntry& entry = callbacks_[i];
+            if (entry.valid) {
+                if (entry.trampoline == nullptr) {
+                    entry.cb(msg);
+                } else {
+                    entry.trampoline(msg, reinterpret_cast<void*>(entry.cb));
+                }
             }
         }
         return PublishStatus::SUCCESS;
     }
 
+    /**
+     * @brief Unsubscribe from the channel
+     * @param index The index of the callback to unsubscribe
+     * @return SubscribeStatus::SUCCESS if the callback was unsubscribed successfully
+     * @note The index field of the SubscribeResult is not valid for this method
+     */
+    SubscribeResult Unsubscribe(subscriptionidx_t index) {
+        SubscribeResult result(SubscribeStatus::SUCCESS, num_callbacks_);
+        do {
+            if (index >= kMaxCallbacks) {
+                result.result = SubscribeStatus::INVALID_PARAMETERS;
+                break;
+            }
+
+            // Check if the callback table entry is valid
+            if (callbacks_[index].valid == false) {
+                result.result = SubscribeStatus::INVALID_PARAMETERS;
+                break;
+            }
+
+            // Make the callback table entry invalid
+            callbacks_[index].valid = false;
+            callbacks_[index].cb = nullptr;
+            callbacks_[index].trampoline = nullptr;
+            num_callbacks_--;
+            result.num_subscribers = num_callbacks_;
+
+        } while (0);
+        return result;
+    }
+
     static constexpr uint32_t kMaxCallbacks = 32;
+
+    /**
+     * @brief Get the number of callbacks subscribed to the channel
+     * @return The number of callbacks subscribed to the channel
+     * @note This method is intended for testing purposes only
+     */
+    subscriptionidx_t GetNumCallbacks() { return num_callbacks_; }
 
    private:
     typedef struct {
-        Callback cb;
+        bool valid = false;
+        Callback cb = nullptr;
         Trampoline trampoline = nullptr;
     } CallbackTableEntry;
 
@@ -142,6 +186,7 @@ class Channel {
 
             callbacks_[num_callbacks_].cb = cb;
             callbacks_[num_callbacks_].trampoline = trampoline;
+            callbacks_[num_callbacks_].valid = true;
             result.index = num_callbacks_;
             num_callbacks_++;
             result.num_subscribers = num_callbacks_;

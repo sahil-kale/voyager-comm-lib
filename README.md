@@ -20,6 +20,9 @@ The `Subscribe` function permits a callback to a class's member function to be r
 ```SubscribeStatus SubscribeNoContext(Callback cb)```
 The `SubscribeNoContext` function permits a callback to a regular free-function, function-pointer style. 
 
+```SubscribeResult Unsubscribe(subscriptionidx_t index)```
+The `Unsubscribe` function removes a callback registration given a particular subscription ID. 
+
 ```PublishStatus Publish(const T& msg)```
 The `Publish` function broadcasts a message to the subscribers of a channel in the order that they are subscribed to.
 
