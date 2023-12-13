@@ -35,8 +35,12 @@ TEST(CommApi, PublishCallback) {
     Channel<TestMessage0> channel;
     FakeSubscriber subscriber;
     Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback{&FakeSubscriber::Callback, &subscriber};
+    
+    Channel<TestMessage0>::SubscribeResult status = channel.Subscribe(callback);
 
-    EXPECT_EQ(channel.Subscribe(callback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(status.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(status.index, 0);
+    EXPECT_EQ(status.num_subscribers, 1);
     TestMessage0 msg;
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
     EXPECT_EQ(subscriber.num_messages_, 1);
@@ -51,7 +55,7 @@ void FreeFunctionCallback(const TestMessage0& msg) {
 
 TEST(CommApi, PublishFreeFunctionCallback) {
     Channel<TestMessage0> channel;
-    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
     TestMessage0 msg;
     msg.data_ = 0x42;
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
@@ -61,7 +65,7 @@ TEST(CommApi, PublishFreeFunctionCallback) {
 // Test a null callback
 TEST(CommApi, PublishNullCallback) {
     Channel<TestMessage0> channel;
-    EXPECT_EQ(channel.SubscribeNoContext(nullptr), Channel<TestMessage0>::SubscribeStatus::INVALID_PARAMETERS);
+    EXPECT_EQ(channel.SubscribeNoContext(nullptr).result, Channel<TestMessage0>::SubscribeStatus::INVALID_PARAMETERS);
 }
 
 // Test multiple callbacks with fake subscribers
@@ -72,8 +76,15 @@ TEST(CommApi, PublishMultipleCallbacks) {
     Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback1{&FakeSubscriber::Callback, &subscriber1};
     Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback2{&FakeSubscriber::Callback, &subscriber2};
 
-    EXPECT_EQ(channel.Subscribe(callback1), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
-    EXPECT_EQ(channel.Subscribe(callback2), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    Channel<TestMessage0>::SubscribeResult status1 = channel.Subscribe(callback1);
+    Channel<TestMessage0>::SubscribeResult status2 = channel.Subscribe(callback2);
+
+    EXPECT_EQ(status1.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(status1.index, 0);
+    EXPECT_EQ(status1.num_subscribers, 1);
+    EXPECT_EQ(status2.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(status2.index, 1);
+    EXPECT_EQ(status2.num_subscribers, 2);
     TestMessage0 msg;
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
     EXPECT_EQ(subscriber1.num_messages_, 1);
@@ -83,8 +94,8 @@ TEST(CommApi, PublishMultipleCallbacks) {
 // Test multiple callbacks with free functions
 TEST(CommApi, PublishMultipleFreeFunctionCallbacks) {
     Channel<TestMessage0> channel;
-    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
-    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.SubscribeNoContext(&FreeFunctionCallback).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
     TestMessage0 msg;
     msg.data_ = 0x42;
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
@@ -97,7 +108,7 @@ TEST(CommApi, PublishMultiple) {
     FakeSubscriber subscriber;
     Channel<TestMessage0>::MemberFunctionCallback<FakeSubscriber> callback{&FakeSubscriber::Callback, &subscriber};
 
-    EXPECT_EQ(channel.Subscribe(callback), Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+    EXPECT_EQ(channel.Subscribe(callback).result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
     TestMessage0 msg;
     EXPECT_EQ(channel.Publish(msg), Channel<TestMessage0>::PublishStatus::SUCCESS);
     EXPECT_EQ(subscriber.num_messages_, 1);
@@ -113,10 +124,10 @@ class FakeSubscriberSubscribingFromClass {
             &FakeSubscriberSubscribingFromClass::Callback, this};
 
         // Subscribe to the channel
-        Channel<TestMessage0>::SubscribeStatus status = testChannel.Subscribe(callback);
+        Channel<TestMessage0>::SubscribeResult status = testChannel.Subscribe(callback);
 
         // Expect the subscription to succeed
-        EXPECT_EQ(status, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
+        EXPECT_EQ(status.result, Channel<TestMessage0>::SubscribeStatus::SUCCESS);
     }
 
     void Callback(const TestMessage0& msg) {

@@ -21,6 +21,16 @@ class Channel {
         INVALID_PARAMETERS,
     };
 
+    typedef uint32_t subscribeindex_t;
+
+    class SubscribeResult {
+       public:
+        SubscribeResult(SubscribeStatus status, uint32_t num_subscribers) : result(status), num_subscribers(num_subscribers) {}
+        SubscribeStatus result = 0;
+        subscribeindex_t index = 0;
+        subscribeindex_t num_subscribers = 0;
+    };
+
     Channel() = default;
     ~Channel() = default;
 
@@ -56,7 +66,7 @@ class Channel {
      *     a context parameter
      */
     template <typename U>
-    SubscribeStatus Subscribe(MemberFunctionCallback<U>& callback) {
+    SubscribeResult Subscribe(MemberFunctionCallback<U>& callback) {
         // Call the default Subscribe method with a pointer to the trampoline
         // function and a pointer to the member function callback.
 
@@ -83,7 +93,7 @@ class Channel {
      * @note This method is used for subscribing to a free function callback and does not
      *      require a context parameter
      */
-    SubscribeStatus SubscribeNoContext(Callback cb) { return SubscribeBase(cb, nullptr); }
+    SubscribeResult SubscribeNoContext(Callback cb) { return SubscribeBase(cb, nullptr); }
 
     /**
      * @brief Publish a message to all subscribers
@@ -118,23 +128,25 @@ class Channel {
      * @param trampoline The trampoline function to use
      * @return SubscribeStatus::SUCCESS if the callback was subscribed successfully
      */
-    SubscribeStatus SubscribeBase(Callback cb, Trampoline trampoline) {
-        SubscribeStatus status = SubscribeStatus::SUCCESS;
+    SubscribeResult SubscribeBase(Callback cb, Trampoline trampoline) {
+        SubscribeResult result(SubscribeStatus::SUCCESS, num_callbacks_);
         do {
             if (num_callbacks_ >= kMaxCallbacks) {
-                status = SubscribeStatus::FULL;
+                result.result = SubscribeStatus::FULL;
                 break;
             }
             if (cb == nullptr) {
-                status = SubscribeStatus::INVALID_PARAMETERS;
+                result.result = SubscribeStatus::INVALID_PARAMETERS;
                 break;
             }
 
             callbacks_[num_callbacks_].cb = cb;
             callbacks_[num_callbacks_].trampoline = trampoline;
+            result.index = num_callbacks_;
             num_callbacks_++;
+            result.num_subscribers = num_callbacks_;
         } while (0);
-        return status;
+        return result;
     }
 };
 
